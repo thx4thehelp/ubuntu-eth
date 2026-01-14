@@ -11,8 +11,6 @@ interface ApiKeyData {
 	isActive: boolean;
 	customLimits?: {
 		per10Min?: number;
-		perDay?: number;
-		perMonth?: number;
 	};
 	metadata?: Record<string, string>;
 }

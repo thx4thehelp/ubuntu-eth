@@ -61,16 +61,6 @@ const ERC20_ABI = [
 		stateMutability: 'view',
 		inputs: [],
 		outputs: [{ name: '', type: 'uint256' }]
-	},
-	{
-		name: 'transfer',
-		type: 'function',
-		stateMutability: 'nonpayable',
-		inputs: [
-			{ name: 'to', type: 'address' },
-			{ name: 'amount', type: 'uint256' }
-		],
-		outputs: [{ name: '', type: 'bool' }]
 	}
 ] as const;
 
@@ -512,5 +502,3 @@ export function generateWallet(): {
 export function validateAddress(address: string): boolean {
 	return isAddress(address);
 }
-
-export { formatEther, formatUnits, parseEther };

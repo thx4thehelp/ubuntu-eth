@@ -11,11 +11,7 @@ interface RateLimitEntry {
 }
 
 interface RateLimitStore {
-	[key: string]: {
-		per10Min?: RateLimitEntry;
-		perDay?: RateLimitEntry;
-		perMonth?: RateLimitEntry;
-	};
+	[key: string]: RateLimitEntry;
 }
 
 interface ApiKeyData {
@@ -26,8 +22,6 @@ interface ApiKeyData {
 	isActive: boolean;
 	customLimits?: {
 		per10Min?: number;
-		perDay?: number;
-		perMonth?: number;
 	};
 	metadata?: Record<string, string>;
 }
@@ -142,136 +136,65 @@ export function updateApiKeyLimits(
 	return true;
 }
 
-// ============ Rate Limiting (메모리에서만 관리) ============
+// ============ Rate Limiting (10분만, 메모리에서만 관리) ============
 
 const WINDOW_10MIN = 10 * 60 * 1000; // ms
-const WINDOW_DAY = 24 * 60 * 60 * 1000;
-const WINDOW_MONTH = 30 * 24 * 60 * 60 * 1000;
 
-interface RateLimitConfig {
-	per10Min: number;
-	perDay: number;
-	perMonth: number;
-}
-
-const DEFAULT_LIMITS: RateLimitConfig = {
-	per10Min: parseInt(process.env.API_RATE_LIMIT_PER_10MIN || '100'),
-	perDay: parseInt(process.env.API_RATE_LIMIT_PER_DAY || '10000'),
-	perMonth: parseInt(process.env.API_RATE_LIMIT_PER_MONTH || '300000')
-};
+const DEFAULT_LIMIT = parseInt(process.env.API_RATE_LIMIT_PER_10MIN || '30000');
 
 export interface RateLimitResult {
 	allowed: boolean;
-	remaining: {
-		per10Min: number;
-		perDay: number;
-		perMonth: number;
-	};
-	resetTimes: {
-		per10Min: number;
-		perDay: number;
-		perMonth: number;
-	};
-	limitExceeded?: '10min' | 'day' | 'month';
+	remaining: number;
+	resetTime: number;
 }
 
 export function checkRateLimit(
 	apiKey: string,
-	customLimits?: Partial<RateLimitConfig>
+	customLimit?: number
 ): RateLimitResult {
 	const now = Date.now();
-	const limits = { ...DEFAULT_LIMITS, ...customLimits };
+	const limit = customLimit ?? DEFAULT_LIMIT;
 
-	if (!rateLimits[apiKey]) {
-		rateLimits[apiKey] = {};
+	// Clean expired
+	if (rateLimits[apiKey] && rateLimits[apiKey].expiresAt < now) {
+		delete rateLimits[apiKey];
 	}
 
 	const entry = rateLimits[apiKey];
+	const count = entry?.count || 0;
+	const resetTime = entry ? Math.ceil((entry.expiresAt - now) / 1000) : WINDOW_10MIN / 1000;
 
-	// Clean expired
-	if (entry.per10Min && entry.per10Min.expiresAt < now) delete entry.per10Min;
-	if (entry.perDay && entry.perDay.expiresAt < now) delete entry.perDay;
-	if (entry.perMonth && entry.perMonth.expiresAt < now) delete entry.perMonth;
-
-	// Get current counts
-	const count10Min = entry.per10Min?.count || 0;
-	const countDay = entry.perDay?.count || 0;
-	const countMonth = entry.perMonth?.count || 0;
-
-	// Calculate reset times (in seconds)
-	const reset10Min = entry.per10Min ? Math.ceil((entry.per10Min.expiresAt - now) / 1000) : WINDOW_10MIN / 1000;
-	const resetDay = entry.perDay ? Math.ceil((entry.perDay.expiresAt - now) / 1000) : WINDOW_DAY / 1000;
-	const resetMonth = entry.perMonth ? Math.ceil((entry.perMonth.expiresAt - now) / 1000) : WINDOW_MONTH / 1000;
-
-	// Check limits
-	if (count10Min >= limits.per10Min) {
+	// Check limit
+	if (count >= limit) {
 		return {
 			allowed: false,
-			remaining: { per10Min: 0, perDay: limits.perDay - countDay, perMonth: limits.perMonth - countMonth },
-			resetTimes: { per10Min: reset10Min, perDay: resetDay, perMonth: resetMonth },
-			limitExceeded: '10min'
+			remaining: 0,
+			resetTime
 		};
 	}
 
-	if (countDay >= limits.perDay) {
-		return {
-			allowed: false,
-			remaining: { per10Min: limits.per10Min - count10Min, perDay: 0, perMonth: limits.perMonth - countMonth },
-			resetTimes: { per10Min: reset10Min, perDay: resetDay, perMonth: resetMonth },
-			limitExceeded: 'day'
-		};
+	// Increment counter
+	if (!rateLimits[apiKey]) {
+		rateLimits[apiKey] = { count: 0, expiresAt: now + WINDOW_10MIN };
 	}
-
-	if (countMonth >= limits.perMonth) {
-		return {
-			allowed: false,
-			remaining: { per10Min: limits.per10Min - count10Min, perDay: limits.perDay - countDay, perMonth: 0 },
-			resetTimes: { per10Min: reset10Min, perDay: resetDay, perMonth: resetMonth },
-			limitExceeded: 'month'
-		};
-	}
-
-	// Increment counters
-	if (!entry.per10Min) entry.per10Min = { count: 0, expiresAt: now + WINDOW_10MIN };
-	if (!entry.perDay) entry.perDay = { count: 0, expiresAt: now + WINDOW_DAY };
-	if (!entry.perMonth) entry.perMonth = { count: 0, expiresAt: now + WINDOW_MONTH };
-
-	entry.per10Min.count++;
-	entry.perDay.count++;
-	entry.perMonth.count++;
+	rateLimits[apiKey].count++;
 
 	return {
 		allowed: true,
-		remaining: {
-			per10Min: limits.per10Min - entry.per10Min.count,
-			perDay: limits.perDay - entry.perDay.count,
-			perMonth: limits.perMonth - entry.perMonth.count
-		},
-		resetTimes: {
-			per10Min: Math.ceil((entry.per10Min.expiresAt - now) / 1000),
-			perDay: Math.ceil((entry.perDay.expiresAt - now) / 1000),
-			perMonth: Math.ceil((entry.perMonth.expiresAt - now) / 1000)
-		}
+		remaining: limit - rateLimits[apiKey].count,
+		resetTime: Math.ceil((rateLimits[apiKey].expiresAt - now) / 1000)
 	};
 }
 
-export function getUsageStats(apiKey: string): {
-	per10Min: number;
-	perDay: number;
-	perMonth: number;
-} {
+export function getUsageStats(apiKey: string): number {
 	const now = Date.now();
 	const entry = rateLimits[apiKey];
 
-	if (!entry) {
-		return { per10Min: 0, perDay: 0, perMonth: 0 };
+	if (!entry || entry.expiresAt < now) {
+		return 0;
 	}
 
-	return {
-		per10Min: (entry.per10Min && entry.per10Min.expiresAt > now) ? entry.per10Min.count : 0,
-		perDay: (entry.perDay && entry.perDay.expiresAt > now) ? entry.perDay.count : 0,
-		perMonth: (entry.perMonth && entry.perMonth.expiresAt > now) ? entry.perMonth.count : 0
-	};
+	return entry.count;
 }
 
 // Initialize on module load

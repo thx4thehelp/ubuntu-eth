@@ -37,34 +37,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	// Check rate limit
-	const rateLimit = checkRateLimit(apiKey, validation.data?.customLimits);
+	const rateLimit = checkRateLimit(apiKey, validation.data?.customLimits?.per10Min);
 
-	// Add rate limit headers
+	// Store for use in routes
 	event.locals.rateLimitInfo = rateLimit;
 	event.locals.apiKeyData = validation.data;
 
 	if (!rateLimit.allowed) {
-		const retryAfter =
-			rateLimit.limitExceeded === '10min'
-				? rateLimit.resetTimes.per10Min
-				: rateLimit.limitExceeded === 'day'
-					? rateLimit.resetTimes.perDay
-					: rateLimit.resetTimes.perMonth;
-
 		return json(
 			{
 				error: 'Rate limit exceeded',
-				limitExceeded: rateLimit.limitExceeded,
-				retryAfter,
+				retryAfter: rateLimit.resetTime,
 				remaining: rateLimit.remaining
 			},
 			{
 				status: 429,
 				headers: {
-					'Retry-After': retryAfter.toString(),
-					'X-RateLimit-Remaining-10Min': rateLimit.remaining.per10Min.toString(),
-					'X-RateLimit-Remaining-Day': rateLimit.remaining.perDay.toString(),
-					'X-RateLimit-Remaining-Month': rateLimit.remaining.perMonth.toString()
+					'Retry-After': rateLimit.resetTime.toString(),
+					'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+					'X-RateLimit-Reset': rateLimit.resetTime.toString()
 				}
 			}
 		);
@@ -74,9 +65,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Add rate limit headers to successful responses
 	const newHeaders = new Headers(response.headers);
-	newHeaders.set('X-RateLimit-Remaining-10Min', rateLimit.remaining.per10Min.toString());
-	newHeaders.set('X-RateLimit-Remaining-Day', rateLimit.remaining.perDay.toString());
-	newHeaders.set('X-RateLimit-Remaining-Month', rateLimit.remaining.perMonth.toString());
+	newHeaders.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
+	newHeaders.set('X-RateLimit-Reset', rateLimit.resetTime.toString());
 
 	return new Response(response.body, {
 		status: response.status,

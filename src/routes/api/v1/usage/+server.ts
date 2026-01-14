@@ -1,11 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getUsageStats } from '$lib/server/store';
-import {
-	API_RATE_LIMIT_PER_10MIN,
-	API_RATE_LIMIT_PER_DAY,
-	API_RATE_LIMIT_PER_MONTH
-} from '$env/static/private';
+import { API_RATE_LIMIT_PER_10MIN } from '$env/static/private';
 
 // Get usage stats for current API key
 export const GET: RequestHandler = async ({ request }) => {
@@ -21,11 +17,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		success: true,
 		data: {
 			usage,
-			limits: {
-				per10Min: parseInt(API_RATE_LIMIT_PER_10MIN || '100'),
-				perDay: parseInt(API_RATE_LIMIT_PER_DAY || '10000'),
-				perMonth: parseInt(API_RATE_LIMIT_PER_MONTH || '300000')
-			}
+			limit: parseInt(API_RATE_LIMIT_PER_10MIN || '30000')
 		}
 	});
 };
