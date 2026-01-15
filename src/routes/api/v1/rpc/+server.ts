@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { ERIGON_RPC_URL } from '$env/static/private';
 
 // JSON-RPC 프록시 - Infura/Alchemy 호환
-export const POST: RequestHandler = async ({ request, url }) => {
+export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 
