@@ -135,8 +135,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		const blockNumData = await blockNumRes.json();
 		const latestBlock = parseInt(blockNumData.result, 16);
 
-		// 블록 범위 (기본: 최근 72만 블록, 약 100일)
-		const defaultFromBlock = Math.max(0, latestBlock - 720000);
+		// 블록 범위 (기본: 최근 21.6만 블록, 약 30일)
+		const defaultFromBlock = Math.max(0, latestBlock - 216000);
 		const fromBlock = url.searchParams.get('fromBlock') || '0x' + defaultFromBlock.toString(16);
 		const toBlock = url.searchParams.get('toBlock') || 'latest';
 		const walletTopic = addressToTopic(address);
