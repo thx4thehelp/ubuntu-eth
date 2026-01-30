@@ -120,11 +120,25 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
 	const offset = parseInt(url.searchParams.get('offset') || '0');
 
-	// 블록 범위 (최근 10만 블록, 약 2주)
-	const fromBlock = url.searchParams.get('fromBlock') || 'earliest';
-	const toBlock = url.searchParams.get('toBlock') || 'latest';
-
 	try {
+		// 최신 블록 번호 조회
+		const blockNumRes = await fetch(ERIGON_RPC_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				method: 'eth_blockNumber',
+				params: [],
+				id: 0
+			})
+		});
+		const blockNumData = await blockNumRes.json();
+		const latestBlock = parseInt(blockNumData.result, 16);
+
+		// 블록 범위 (기본: 최근 50만 블록, 약 2개월)
+		const defaultFromBlock = Math.max(0, latestBlock - 500000);
+		const fromBlock = url.searchParams.get('fromBlock') || '0x' + defaultFromBlock.toString(16);
+		const toBlock = url.searchParams.get('toBlock') || 'latest';
 		const walletTopic = addressToTopic(address);
 		const tokenAddressFilter = tokenFilter ? [tokenFilter.toLowerCase()] : undefined;
 
