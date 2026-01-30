@@ -6,6 +6,7 @@ Erigon 아카이브 노드 기반 이더리움 API 서비스. API 키 인증 및
 
 - JSON-RPC 프록시 (Infura/Alchemy 호환)
 - 트랜잭션 히스토리 조회 (trace_filter 기반)
+- ERC-20 토큰 전송 히스토리 조회
 - ETH 잔액 조회
 - 트랜잭션 정보/영수증 조회
 - 블록 정보 조회
@@ -87,6 +88,7 @@ PORT=3002 node build
 | GET | /api/v1/gas/history | 가스 히스토리 |
 | GET | /api/v1/token/balance | ERC-20 잔액 |
 | GET | /api/v1/token/info/:address | ERC-20 정보 |
+| GET | /api/v1/token/transfers/:address | ERC-20 전송 히스토리 |
 | GET | /api/v1/nft/balance | NFT 잔액 |
 | GET | /api/v1/nft/owner | NFT 소유자 |
 | GET | /api/v1/usage | 사용량 조회 |
@@ -133,6 +135,18 @@ curl "https://your-domain.com/api/v1/wallet/history/0x...?fromBlock=0x0&toBlock=
 ```bash
 # ETH 잔액 조회
 curl https://your-domain.com/api/v1/wallet/balance/0x... \
+  -H "x-api-key: eth_xxx"
+```
+
+### 토큰 전송 히스토리
+
+```bash
+# 전체 토큰 전송 기록
+curl "https://your-domain.com/api/v1/token/transfers/0x...?limit=50" \
+  -H "x-api-key: eth_xxx"
+
+# 특정 토큰만 필터링
+curl "https://your-domain.com/api/v1/token/transfers/0x...?token=0xdAC17F958D2ee523a2206206994597C13D831ec7&limit=50" \
   -H "x-api-key: eth_xxx"
 ```
 
